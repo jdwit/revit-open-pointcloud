@@ -27,6 +27,7 @@
   <ItemGroup>
     <None Include="OpenPointCloud.addin" CopyToOutputDirectory="PreserveNewest" />
     <EmbeddedResource Include="Resources\icon*.png" LogicalName="%(Filename)%(Extension)" />
+    <InternalsVisibleTo Include="OpenPointCloud.Tests" />
   </ItemGroup>
 
 </Project>

@@ -4,6 +4,7 @@ obj/
 .vs/
 *.ply
 *.e57
+!tests/OpenPointCloud.Tests/Data/*.e57
 *.opc
 *.opc.tmp
 TestResults/

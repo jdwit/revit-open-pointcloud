@@ -4,7 +4,7 @@ using Autodesk.Revit.DB;
 
 namespace OpenPointCloud;
 
-/// <summary>Facts about a PLY point cloud. Coordinates are in meters, in the coordinates of the file.</summary>
+/// <summary>Facts about a point cloud file (PLY or E57). Coordinates are in meters, in the coordinates of the file.</summary>
 public sealed record CloudInfo(
     string File, long Bytes, int Points, bool HasColour,
     double[] Min, double[] Max, double[] Size, bool IndexFromCache);
@@ -24,25 +24,25 @@ public static class Api
 {
     internal static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
-    /// <summary>Links a binary PLY as a point cloud. The first link makes the index next to the PLY.</summary>
-    public static LinkResult Link(Document doc, string plyPath)
+    /// <summary>Links a PLY or E57 file as a point cloud. The first link makes the index next to the file.</summary>
+    public static LinkResult Link(Document doc, string path)
     {
-        var ply = Path.GetFullPath(plyPath);
-        if (!File.Exists(ply)) throw new FileNotFoundException("PLY file not found.", ply);
-        bool cached = Index.IsCurrent(ply);
+        var full = Path.GetFullPath(path);
+        if (!File.Exists(full)) throw new FileNotFoundException("Point cloud file not found.", full);
+        bool cached = Index.IsCurrent(full);
         var clock = System.Diagnostics.Stopwatch.StartNew();
-        var id = App.Link(doc, ply);
+        var id = App.Link(doc, full);
         clock.Stop();
-        return new LinkResult(id.Value, Inspect(ply, cached), Math.Round(clock.Elapsed.TotalSeconds, 2));
+        return new LinkResult(id.Value, Inspect(full, cached), Math.Round(clock.Elapsed.TotalSeconds, 2));
     }
 
-    /// <summary>Reads the facts of a PLY. Makes the index if necessary. Needs no Revit document.</summary>
-    public static CloudInfo Inspect(string plyPath) => Inspect(Path.GetFullPath(plyPath), Index.IsCurrent(Path.GetFullPath(plyPath)));
+    /// <summary>Reads the facts of a PLY or E57 file. Makes the index if necessary. Needs no Revit document.</summary>
+    public static CloudInfo Inspect(string path) => Inspect(Path.GetFullPath(path), Index.IsCurrent(Path.GetFullPath(path)));
 
-    internal static CloudInfo Inspect(string ply, bool cached)
+    internal static CloudInfo Inspect(string path, bool cached)
     {
-        if (!Index.IsCurrent(ply)) Index.Build(ply);
-        var index = Index.Load(ply);
+        if (!Index.IsCurrent(path)) Index.Build(path);
+        var index = Index.Load(path);
         var min = new double[3];
         var max = new double[3];
         var size = new double[3];
@@ -52,7 +52,7 @@ public static class Api
             max[a] = Math.Round(index.Origin[a] + index.Max[a], 3);
             size[a] = Math.Round(max[a] - min[a], 3);
         }
-        return new CloudInfo(Path.GetFileName(ply), new FileInfo(ply).Length, index.Points.Length,
+        return new CloudInfo(Path.GetFileName(path), new FileInfo(path).Length, index.Points.Length,
             HasColour(index.Points), min, max, size, cached);
     }
 

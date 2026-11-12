@@ -12,10 +12,11 @@ Point cloud: "2025 Trippenhuis gevel" by the Cultural Heritage Agency of the Net
 
 ## Features
 
-- Links a binary PLY file as a Revit point cloud, with colour.
+- Links a binary PLY or an E57 file as a Revit point cloud, with colour.
+- Reads all scans in an E57 file and applies the position of each scan. Without colour, the add-in uses the intensity as grey.
 - Large coordinates (for example national grid coordinates) keep their full precision.
-- The first link makes a spatial index next to the PLY (`<name>.ply.opc`). The next link takes less than a second.
-- If the PLY is in Downloads, on the desktop or in a temporary folder, the add-in offers to copy it to the project folder.
+- The first link makes a spatial index next to the file (for example `<name>.ply.opc`). The next link takes less than a second.
+- If the file is in Downloads, on the desktop or in a temporary folder, the add-in offers to copy it to the project folder.
 - Works in Revit 2025, 2026 and 2027.
 
 The linked cloud is a native Revit point cloud. Revit already supports point clouds well. Views, crop regions and section boxes cut the cloud. You can snap to points, and Move and Rotate align the cloud.
@@ -36,14 +37,14 @@ To remove the add-in, close Revit and run `install.ps1` with `-Uninstall`.
 ## Use
 
 1. Click Add-Ins > Open Point Cloud > Link point cloud.
-2. Select a `.ply` file. The add-in links the cloud, selects it and zooms to it.
+2. Select a `.ply` or `.e57` file. The add-in links the cloud, selects it and zooms to it.
 3. Align the cloud with Move and Rotate.
 
-Other formats (E57, LAS, LAZ): open them in CloudCompare and save as binary PLY.
+Other formats (for example LAS and LAZ): open them in CloudCompare and save as binary PLY.
 
 ## Agents and scripting
 
-I designed the add-in for agents and scripts too. A public API links a PLY without dialogs and returns a JSON summary. The skill [`skills/open-point-cloud/SKILL.md`](skills/open-point-cloud/SKILL.md) tells an agent how to use it.
+I designed the add-in for agents and scripts too. A public API links a PLY or E57 file without dialogs and returns a JSON summary. The skill [`skills/open-point-cloud/SKILL.md`](skills/open-point-cloud/SKILL.md) tells an agent how to use it.
 
 ## Build
 
@@ -69,7 +70,7 @@ pre-commit install
 - [x] Full precision for large coordinates
 - [x] Select and zoom after the link, copy offer for a PLY in a temporary folder
 - [x] Builds for Revit 2025, 2026 and 2027
-- [ ] Support the E57 input format (`specs/03-e57-input.md`)
+- [x] Support the E57 input format (`specs/03-e57-input.md`)
 - [ ] Indicate the distance from the cloud to the model (`specs/04-distance-to-model.md`)
 
 Specs for each feature: `specs/`.

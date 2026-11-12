@@ -14,7 +14,7 @@ public struct Pt
 /// <summary>Cell of the uniform grid. The cache keeps the points of a cell in random order.</summary>
 public readonly record struct Cell(float MinX, float MinY, float MinZ, float MaxX, float MaxY, float MaxZ, int Start, int Count);
 
-/// <summary>Spatial index of a PLY file. The cache file is next to the PLY.</summary>
+/// <summary>Spatial index of a point cloud file (PLY or E57). The cache file is next to the source file.</summary>
 public sealed class Index
 {
     const int Magic = 0x49435052; // "RPCI"
@@ -45,14 +45,14 @@ public sealed class Index
         }
     }
 
-    public static string CachePath(string ply) => ply + ".opc";
+    public static string CachePath(string path) => path + ".opc";
 
     /// <summary>Optional sidecar with the move "dx dy dz" in meters. The index applies it to all points.</summary>
-    public static string AlignPath(string ply) => ply + ".align";
+    public static string AlignPath(string path) => path + ".align";
 
-    static double[] ReadAlign(string ply)
+    static double[] ReadAlign(string path)
     {
-        var p = AlignPath(ply);
+        var p = AlignPath(path);
         if (!File.Exists(p)) return new double[3];
         var v = File.ReadAllText(p).Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
             .Select(x => double.Parse(x, System.Globalization.CultureInfo.InvariantCulture)).ToArray();
@@ -60,25 +60,26 @@ public sealed class Index
         return v;
     }
 
-    static long AlignStamp(string ply) => File.Exists(AlignPath(ply)) ? File.GetLastWriteTimeUtc(AlignPath(ply)).Ticks : 0;
+    static long AlignStamp(string path) => File.Exists(AlignPath(path)) ? File.GetLastWriteTimeUtc(AlignPath(path)).Ticks : 0;
 
     /// <summary>Returns true if the cache exists and matches the source file.</summary>
-    public static bool IsCurrent(string ply)
+    public static bool IsCurrent(string path)
     {
-        var cache = CachePath(ply);
+        var cache = CachePath(path);
         if (!File.Exists(cache)) return false;
-        var src = new FileInfo(ply);
+        var src = new FileInfo(path);
         using var r = new BinaryReader(File.OpenRead(cache));
         return r.ReadInt32() == Magic && r.ReadInt32() == Version
-            && r.ReadInt64() == src.Length && r.ReadInt64() == src.LastWriteTimeUtc.Ticks && r.ReadInt64() == AlignStamp(ply);
+            && r.ReadInt64() == src.Length && r.ReadInt64() == src.LastWriteTimeUtc.Ticks && r.ReadInt64() == AlignStamp(path);
     }
 
-    /// <summary>Reads the PLY, sorts the points into cells and writes the cache.</summary>
-    public static void Build(string ply, double cellSize = 1.0, Action<string, double>? progress = null)
+    /// <summary>Reads the point cloud file, sorts the points into cells and writes the cache.</summary>
+    public static void Build(string path, double cellSize = 1.0, Action<string, double>? progress = null)
     {
-        var (xyz, rgb) = Ply.Read(ply, f => progress?.Invoke("Read", f));
+        var (xyz, rgb) = PointFile.Read(path, f => progress?.Invoke("Read", f));
         long n = rgb.Length;
-        var align = ReadAlign(ply);
+        if (n == 0) throw new InvalidDataException("The point cloud has no points.");
+        var align = ReadAlign(path);
         for (long i = 0; i < n; i++)
             for (int a = 0; a < 3; a++) xyz[i * 3 + a] += align[a];
         var min = new double[] { double.MaxValue, double.MaxValue, double.MaxValue };
@@ -129,11 +130,11 @@ public sealed class Index
         }
         progress?.Invoke("Write", 0.9);
 
-        var src = new FileInfo(ply);
-        var tmp = CachePath(ply) + ".tmp";
+        var src = new FileInfo(path);
+        var tmp = CachePath(path) + ".tmp";
         using (var w = new BinaryWriter(File.Create(tmp)))
         {
-            w.Write(Magic); w.Write(Version); w.Write(src.Length); w.Write(src.LastWriteTimeUtc.Ticks); w.Write(AlignStamp(ply));
+            w.Write(Magic); w.Write(Version); w.Write(src.Length); w.Write(src.LastWriteTimeUtc.Ticks); w.Write(AlignStamp(path));
             w.Write(cellSize); w.Write(origin[0]); w.Write(origin[1]); w.Write(origin[2]); w.Write(cells.Count); w.Write(n);
             foreach (var c in cells)
             {
@@ -143,20 +144,20 @@ public sealed class Index
             }
             w.Write(MemoryMarshal.AsBytes(pts.AsSpan()));
         }
-        File.Move(tmp, CachePath(ply), true);
-        Forget(ply);
+        File.Move(tmp, CachePath(path), true);
+        Forget(path);
         progress?.Invoke("Done", 1.0);
     }
 
     static readonly Dictionary<string, Index> Loaded = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Loads the cache once per Revit session.</summary>
-    public static Index Load(string ply)
+    public static Index Load(string path)
     {
         lock (Loaded)
         {
-            if (Loaded.TryGetValue(ply, out var ix)) return ix;
-            using var r = new BinaryReader(File.OpenRead(CachePath(ply)));
+            if (Loaded.TryGetValue(path, out var ix)) return ix;
+            using var r = new BinaryReader(File.OpenRead(CachePath(path)));
             if (r.ReadInt32() != Magic || r.ReadInt32() != Version) throw new InvalidDataException("Cache format is not valid.");
             r.ReadInt64(); r.ReadInt64(); r.ReadInt64();
             double cellSize = r.ReadDouble();
@@ -169,14 +170,14 @@ public sealed class Index
                     r.ReadSingle(), r.ReadSingle(), r.ReadSingle(), r.ReadInt32(), r.ReadInt32());
             var pts = new Pt[n];
             r.BaseStream.ReadExactly(MemoryMarshal.AsBytes(pts.AsSpan()));
-            ix = new Index(ply, cellSize, origin, cells, pts);
-            Loaded[ply] = ix;
+            ix = new Index(path, cellSize, origin, cells, pts);
+            Loaded[path] = ix;
             return ix;
         }
     }
 
-    public static void Forget(string ply)
+    public static void Forget(string path)
     {
-        lock (Loaded) Loaded.Remove(ply);
+        lock (Loaded) Loaded.Remove(path);
     }
 }
