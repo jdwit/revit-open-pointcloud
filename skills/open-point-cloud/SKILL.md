@@ -1,24 +1,25 @@
 ---
 name: open-point-cloud
-description: Link a PLY point cloud into a Revit model with the Open Point Cloud add-in, from an agent or a script. Use it when a user asks to link, import or check a PLY point cloud in Revit.
+description: Link a PLY or E57 point cloud into a Revit model with the Open Point Cloud add-in, from an agent or a script. Use it when a user asks to link, import or check a PLY or E57 point cloud in Revit.
 ---
 
 # Open Point Cloud for agents
 
-The Open Point Cloud add-in links a binary PLY file as a native Revit point cloud. Agents and scripts use the public API in the namespace `OpenPointCloud`. The API shows no dialogs.
+The Open Point Cloud add-in links a binary PLY or an E57 file as a native Revit point cloud. Agents and scripts use the public API in the namespace `OpenPointCloud`. The API shows no dialogs.
 
 ## Requirements
 
 - Revit 2025, 2026 or 2027 with the add-in installed (see README). Revit loads the assembly `OpenPointCloud` at start-up.
 - A binary little-endian PLY with `x`, `y` and `z` (float, double or int). Colour (`red`, `green`, `blue`) is optional.
-- For E57, LAS or LAZ: convert to binary PLY first, for example with CloudCompare.
+- Or an E57 file. The add-in reads all scans and applies the pose of each scan. Colour and intensity are optional.
+- For LAS or LAZ: convert to binary PLY first, for example with CloudCompare.
 
 ## API
 
 | Call | Result |
 |---|---|
-| `Api.Inspect(plyPath)` | `CloudInfo`: file, bytes, points, hasColour, min, max, size (meters, file coordinates), indexFromCache. Needs no document. Makes the index if necessary. |
-| `Api.Link(doc, plyPath)` | `LinkResult`: elementId of the point cloud instance, the `CloudInfo` and the time in seconds. |
+| `Api.Inspect(path)` | `CloudInfo`: file, bytes, points, hasColour, min, max, size (meters, file coordinates), indexFromCache. Needs no document. Makes the index if necessary. |
+| `Api.Link(doc, path)` | `LinkResult`: elementId of the point cloud instance, the `CloudInfo` and the time in seconds. |
 | `result.ToJson()` | The result as JSON. |
 
 `Api.Link` starts its own transaction. Call it when no transaction is open.
@@ -52,8 +53,8 @@ return result.GetType().GetMethod("ToJson").Invoke(result, null);
 
 ## Facts and traps
 
-- The first link of a PLY makes a cache next to it: `<name>.ply.opc`. Do not delete it. The next link uses it and takes less than a second.
+- The first link of a file makes a cache next to it: `<name>.ply.opc` or `<name>.e57.opc`. Do not delete it. The next link uses it and takes less than a second.
 - The add-in keeps large coordinates (for example national grid coordinates) exact. It puts a 100 m origin in the instance transform.
 - Revit tests the view range of a plan against the cloud. If a plan shows no points, compare the Z values of the cloud (`min`, `max`) with the level height.
-- An optional sidecar `<name>.ply.align` with `dx dy dz` in meters moves all points. A change to it makes a new cache.
-- Without colour in the PLY, Revit shows the points grey.
+- An optional sidecar `<name>.ply.align` (or `<name>.e57.align`) with `dx dy dz` in meters moves all points. A change to it makes a new cache.
+- Without colour, the add-in uses the E57 intensity as grey. Without colour and intensity, Revit shows the points grey.

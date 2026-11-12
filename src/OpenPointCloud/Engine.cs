@@ -4,18 +4,19 @@ using Autodesk.Revit.DB.PointClouds;
 
 namespace OpenPointCloud;
 
-/// <summary>Revit point cloud engine for PLY files. The identifier of a cloud is the path of the PLY.</summary>
-public sealed class PlyEngine : IPointCloudEngine
+/// <summary>Revit point cloud engine for PLY and E57 files. The identifier of a cloud is the path of the file.</summary>
+public sealed class CloudEngine : IPointCloudEngine
 {
+    // Linked models keep this engine name, so it stays "ply" for all formats.
     public const string Id = "ply";
 
     public IPointCloudAccess CreatePointCloudAccess(string identifier)
     {
         try
         {
-            // Make a new index only if the PLY is present. Without the PLY, the cache is enough.
+            // Make a new index only if the source file is present. Without it, the cache is enough.
             if (File.Exists(identifier) && !Index.IsCurrent(identifier)) Index.Build(identifier);
-            return new PlyAccess(Index.Load(identifier));
+            return new CloudAccess(Index.Load(identifier));
         }
         catch (Exception e)
         {
@@ -27,12 +28,12 @@ public sealed class PlyEngine : IPointCloudEngine
     public void Free() { }
 }
 
-public sealed class PlyAccess : IPointCloudAccess
+public sealed class CloudAccess : IPointCloudAccess
 {
     const double MetersToFeet = 1.0 / 0.3048;
     readonly Index _ix;
 
-    public PlyAccess(Index ix) => _ix = ix;
+    public CloudAccess(Index ix) => _ix = ix;
 
     public string GetName() => Path.GetFileName(_ix.Source);
     public PointCloudColorEncoding GetColorEncoding() => PointCloudColorEncoding.ARGB;
@@ -44,24 +45,24 @@ public sealed class PlyAccess : IPointCloudAccess
         new(new XYZ(_ix.Min[0], _ix.Min[1], _ix.Min[2]), new XYZ(_ix.Max[0], _ix.Max[1], _ix.Max[2]));
 
     public IPointSetIterator CreatePointSetIterator(PointCloudFilter filter, ElementId viewId) =>
-        new PlyIterator(_ix, filter, 0);
+        new CloudIterator(_ix, filter, 0);
 
     public IPointSetIterator CreatePointSetIterator(PointCloudFilter filter, double density, ElementId viewId) =>
-        new PlyIterator(_ix, filter, density);
+        new CloudIterator(_ix, filter, density);
 
     // Revit uses this call for snapping: a small filter around the cursor.
     public int ReadPoints(PointCloudFilter filter, ElementId viewId, IntPtr buffer, int size) =>
-        new PlyIterator(_ix, filter, 0).ReadPoints(buffer, size);
+        new CloudIterator(_ix, filter, 0).ReadPoints(buffer, size);
 
     public void Free() { }
 }
 
 /// <summary>Gives the points of the cells that the Revit filter accepts.</summary>
-public sealed class PlyIterator : IPointSetIterator
+public sealed class CloudIterator : IPointSetIterator
 {
     readonly SliceReader _reader;
 
-    public PlyIterator(Index ix, PointCloudFilter filter, double density)
+    public CloudIterator(Index ix, PointCloudFilter filter, double density)
     {
         var todo = new List<(int Cell, bool Partial, int Take)>();
         for (int i = 0; i < ix.Cells.Length; i++)

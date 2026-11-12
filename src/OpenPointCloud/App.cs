@@ -19,7 +19,7 @@ public sealed class App : IExternalApplication
         var button = (PushButton)panel.AddItem(new PushButtonData("LinkPly", "Link point cloud",
             typeof(App).Assembly.Location, typeof(LinkCommand).FullName)
         {
-            ToolTip = "Link a PLY point cloud. The first link makes an index next to the file.",
+            ToolTip = "Link a PLY or E57 point cloud. The first link makes an index next to the file.",
             Image = Icons.Load(16, scale),
             LargeImage = Icons.Load(32, scale),
         });
@@ -30,34 +30,34 @@ public sealed class App : IExternalApplication
 
     public Result OnShutdown(UIControlledApplication app) => Result.Succeeded;
 
-    /// <summary>Registers the PLY engine. A second call replaces the engine.</summary>
+    /// <summary>Registers the point cloud engine. A second call replaces the engine.</summary>
     public static void Register()
     {
-        if (PointCloudEngineRegistry.GetSupportedEngines().Contains(PlyEngine.Id))
-            PointCloudEngineRegistry.UnregisterPointCloudEngine(PlyEngine.Id);
-        PointCloudEngineRegistry.RegisterPointCloudEngine(PlyEngine.Id, new PlyEngine(), true);
+        if (PointCloudEngineRegistry.GetSupportedEngines().Contains(CloudEngine.Id))
+            PointCloudEngineRegistry.UnregisterPointCloudEngine(CloudEngine.Id);
+        PointCloudEngineRegistry.RegisterPointCloudEngine(CloudEngine.Id, new CloudEngine(), true);
     }
 
-    /// <summary>Points an existing cloud instance to another PLY. The instance keeps its position.</summary>
-    public static ElementId Relink(Document doc, ElementId instance, string ply, Action<string, double>? progress = null)
+    /// <summary>Points an existing cloud instance to another point cloud file. The instance keeps its position.</summary>
+    public static ElementId Relink(Document doc, ElementId instance, string path, Action<string, double>? progress = null)
     {
-        if (!Index.IsCurrent(ply)) Index.Build(ply, progress: progress);
+        if (!Index.IsCurrent(path)) Index.Build(path, progress: progress);
         using var t = new Transaction(doc, "Relink point cloud");
         t.Start();
-        var type = PointCloudType.Create(doc, PlyEngine.Id, ply);
+        var type = PointCloudType.Create(doc, CloudEngine.Id, path);
         doc.GetElement(instance).ChangeTypeId(type.Id);
         t.Commit();
         return type.Id;
     }
 
-    /// <summary>Makes the index if necessary, then links the PLY in the document. Returns the instance id.</summary>
-    public static ElementId Link(Document doc, string ply, Action<string, double>? progress = null)
+    /// <summary>Makes the index if necessary, then links the point cloud file in the document. Returns the instance id.</summary>
+    public static ElementId Link(Document doc, string path, Action<string, double>? progress = null)
     {
-        if (!Index.IsCurrent(ply)) Index.Build(ply, progress: progress);
+        if (!Index.IsCurrent(path)) Index.Build(path, progress: progress);
         using var t = new Transaction(doc, "Link point cloud");
         t.Start();
-        var type = PointCloudType.Create(doc, PlyEngine.Id, ply);
-        var o = Index.Load(ply).Origin;
+        var type = PointCloudType.Create(doc, CloudEngine.Id, path);
+        var o = Index.Load(path).Origin;
         var inst = PointCloudInstance.Create(doc, type.Id, Transform.CreateTranslation(new XYZ(o[0], o[1], o[2]) / 0.3048));
         t.Commit();
         return inst.Id;
@@ -71,32 +71,32 @@ public sealed class LinkCommand : IExternalCommand
     {
         var uidoc = data.Application.ActiveUIDocument;
         if (uidoc == null) return Result.Cancelled;
-        using var dlg = new OpenFileDialog { Filter = "PLY point cloud (*.ply)|*.ply", Title = "Link point cloud" };
+        using var dlg = new OpenFileDialog { Filter = PointFile.DialogFilter, Title = "Link point cloud" };
         if (dlg.ShowDialog() != DialogResult.OK) return Result.Cancelled;
         var doc = uidoc.Document;
-        var ply = OfferProjectCopy(doc, dlg.FileName);
+        var path = OfferProjectCopy(doc, dlg.FileName);
 
         ElementId id;
-        bool cached = Index.IsCurrent(ply);
+        bool cached = Index.IsCurrent(path);
         var clock = System.Diagnostics.Stopwatch.StartNew();
         using (var form = new ProgressForm())
         {
             if (!cached) form.Show();
-            id = App.Link(doc, ply, form.Report);
+            id = App.Link(doc, path, form.Report);
         }
         clock.Stop();
 
         // Show the modeller where the cloud is: select it, zoom to it and give a short summary.
         uidoc.Selection.SetElementIds(new List<ElementId> { id });
         uidoc.ShowElements(id);
-        ShowStatus(doc, id, ply, cached, clock.Elapsed.TotalSeconds);
+        ShowStatus(doc, id, path, cached, clock.Elapsed.TotalSeconds);
         return Result.Succeeded;
     }
 
     // Short status after the link: points, colour, size, position, index and time.
-    static void ShowStatus(Document doc, ElementId id, string ply, bool cached, double seconds)
+    static void ShowStatus(Document doc, ElementId id, string path, bool cached, double seconds)
     {
-        var info = Api.Inspect(ply, cached);
+        var info = Api.Inspect(path, cached);
         var bb = doc.GetElement(id).get_BoundingBox(null);
         const double m = 0.3048;
         var td = new TaskDialog("Open Point Cloud")
@@ -112,21 +112,21 @@ public sealed class LinkCommand : IExternalCommand
         td.Show();
     }
 
-    // A PLY in Downloads, on the desktop or in a temp folder breaks the link later.
+    // A point cloud file in Downloads, on the desktop or in a temp folder breaks the link later.
     // Offer to copy it to the folder of the Revit model.
-    static string OfferProjectCopy(Document doc, string ply)
+    static string OfferProjectCopy(Document doc, string path)
     {
-        if (string.IsNullOrEmpty(doc.PathName)) return ply;
-        string full = Path.GetFullPath(ply);
+        if (string.IsNullOrEmpty(doc.PathName)) return path;
+        string full = Path.GetFullPath(path);
         string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         string[] temporary = {
             Path.Combine(home, "Downloads"),
             Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
             Path.GetTempPath() };
-        if (!temporary.Any(t => full.StartsWith(Path.GetFullPath(t), StringComparison.OrdinalIgnoreCase))) return ply;
+        if (!temporary.Any(t => full.StartsWith(Path.GetFullPath(t), StringComparison.OrdinalIgnoreCase))) return path;
 
         string dir = Path.GetDirectoryName(doc.PathName)!;
-        string target = Path.Combine(dir, Path.GetFileName(ply));
+        string target = Path.Combine(dir, Path.GetFileName(path));
         var td = new TaskDialog("Link point cloud")
         {
             MainInstruction = "Copy the point cloud to the project folder?",
@@ -134,7 +134,7 @@ public sealed class LinkCommand : IExternalCommand
             CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No,
             DefaultButton = TaskDialogResult.Yes,
         };
-        if (td.Show() != TaskDialogResult.Yes) return ply;
+        if (td.Show() != TaskDialogResult.Yes) return path;
         if (!File.Exists(target) || new FileInfo(target).Length != new FileInfo(full).Length) File.Copy(full, target, true);
         if (File.Exists(Index.AlignPath(full))) File.Copy(Index.AlignPath(full), Index.AlignPath(target), true);
         return target;

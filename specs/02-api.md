@@ -11,10 +11,12 @@ An agent or a script links a cloud without clicks and without dialogs, and gets 
 
 ## Calls
 
+The path is a PLY or E57 file.
+
 | Call | Result |
 |---|---|
-| `Api.Inspect(plyPath)` | `CloudInfo`: file, bytes, points, hasColour, min, max, size (meters, file coordinates), indexFromCache. Needs no document. Makes the index if necessary. |
-| `Api.Link(doc, plyPath)` | `LinkResult`: elementId of the point cloud instance, the `CloudInfo` and the time in seconds. Starts its own transaction. |
+| `Api.Inspect(path)` | `CloudInfo`: file, bytes, points, hasColour, min, max, size (meters, file coordinates), indexFromCache. Needs no document. Makes the index if necessary. |
+| `Api.Link(doc, path)` | `LinkResult`: elementId of the point cloud instance, the `CloudInfo` and the time in seconds. Starts its own transaction. |
 | `LinkResult.ToJson()` | The result as JSON with camelCase names. |
 
 The namespace is `OpenPointCloud`. The assembly is `OpenPointCloud`.
