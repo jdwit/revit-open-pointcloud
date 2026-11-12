@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RevitAddIns>
+  <AddIn Type="Application">
+    <Name>Open Point Cloud</Name>
+    <Assembly>OpenPointCloud\OpenPointCloud.dll</Assembly>
+    <AddInId>08d305f9-720c-498f-8960-6c59ae73cf22</AddInId>
+    <FullClassName>OpenPointCloud.App</FullClassName>
+    <VendorId>JDWIT</VendorId>
+    <VendorDescription>jdwit</VendorDescription>
+  </AddIn>
+</RevitAddIns>

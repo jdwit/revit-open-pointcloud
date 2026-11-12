@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  quality:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Pre-commit hooks
+        run: |
+          pip install pre-commit
+          pre-commit run --all-files --show-diff-on-failure
+      - name: Lowercase conventional commit messages
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            range="${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
+          else
+            range="HEAD~1..HEAD"; git rev-parse -q --verify HEAD~1 >/dev/null || range="HEAD"
+          fi
+          bad=$(git log --format=%s "$range" | grep -vE '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9-]+\))?!?: [a-z0-9][^A-Z]*$' || true)
+          if [ -n "$bad" ]; then echo "Commit subjects must be lowercase conventional commits:"; echo "$bad"; exit 1; fi
+
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Unit tests
+        run: dotnet test tests/OpenPointCloud.Tests -c Release --logger "console;verbosity=normal"
+
+  build:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        revit: [2025, 2026, 2027]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+      - name: Build for Revit ${{ matrix.revit }}
+        run: dotnet build src/OpenPointCloud -c Release -p:RevitVersion=${{ matrix.revit }} -p:TreatWarningsAsErrors=true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OpenPointCloud-Revit${{ matrix.revit }}
+          path: |
+            src/OpenPointCloud/bin/Release/${{ matrix.revit }}/OpenPointCloud.dll
+            src/OpenPointCloud/bin/Release/${{ matrix.revit }}/OpenPointCloud.deps.json
+            src/OpenPointCloud/bin/Release/${{ matrix.revit }}/OpenPointCloud.addin

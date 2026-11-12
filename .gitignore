@@ -1,0 +1,9 @@
+bin/
+obj/
+*.user
+.vs/
+*.ply
+*.e57
+*.opc
+*.opc.tmp
+TestResults/

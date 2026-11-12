@@ -1,0 +1,52 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        revit: [2025, 2026, 2027]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+      - name: Build for Revit ${{ matrix.revit }}
+        shell: bash
+        run: dotnet build src/OpenPointCloud -c Release -p:RevitVersion=${{ matrix.revit }} -p:Version=${GITHUB_REF_NAME#v} -p:TreatWarningsAsErrors=true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: revit${{ matrix.revit }}
+          path: |
+            src/OpenPointCloud/bin/Release/${{ matrix.revit }}/OpenPointCloud.dll
+            src/OpenPointCloud/bin/Release/${{ matrix.revit }}/OpenPointCloud.deps.json
+            src/OpenPointCloud/bin/Release/${{ matrix.revit }}/OpenPointCloud.addin
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Make the zip
+        run: |
+          name="OpenPointCloud-${GITHUB_REF_NAME}"
+          mkdir -p "dist/$name"
+          for v in 2025 2026 2027; do mkdir -p "dist/$name/$v"; cp artifacts/revit$v/* "dist/$name/$v/"; done
+          cp install.ps1 README.md "dist/$name/"
+          (cd dist && zip -r "$name.zip" "$name")
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.zip
+          generate_release_notes: true
