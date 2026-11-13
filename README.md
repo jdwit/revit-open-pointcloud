@@ -8,7 +8,9 @@ Revit can only read point clouds in the ReCap format natively. This format is cl
 
 ![Link point cloud in Revit: select an E57 file and close the status window. The Trippenhuis facade shows in 3D. The view zooms in on the pediment, then the floor plan shows the facade from above.](docs/demo.gif)
 
-Point cloud: "2025 Trippenhuis gevel" by the Cultural Heritage Agency of the Netherlands (Rijksdienst voor het Cultureel Erfgoed), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), via [Sketchfab](https://sketchfab.com/3d-models/2025-trippenhuis-gevel-868760e44f764273ab9224a2ee3fcc10). Cropped to the facade and converted to E57.
+![The Trippenhuis facade in Amsterdam as a point cloud in Revit. One bay shows a model on the scan: wall, window openings, pilasters and pedestals.](docs/screenshot.jpg)
+
+Point cloud: "2025 Trippenhuis gevel" by the Cultural Heritage Agency of the Netherlands (Rijksdienst voor het Cultureel Erfgoed), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), via [Sketchfab](https://sketchfab.com/3d-models/2025-trippenhuis-gevel-868760e44f764273ab9224a2ee3fcc10). The GIF uses a copy cropped to the facade and converted to E57.
 
 ## Features
 
